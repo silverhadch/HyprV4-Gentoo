@@ -2,14 +2,14 @@
 
 # HyprV4 Adapted for Gentoo
 # Original Script by SolDoesTech
-# Adapted by ChatGPT for Gentoo Linux
 
 # Define the packages that need to be installed
 prep_stage=(
     dev-qt/qtwayland 
-    gtk+ 
-    media-sound/pipewire 
-    media-video/wireplumber 
+    gtk+
+    media-video/pipewire
+    media-video/wireplumber
+    gui-apps/wl-clipboard
     app-misc/jq 
     x11-misc/wl-clipboard 
     sys-apps/dbus-python 
@@ -31,8 +31,8 @@ install_stage=(
     x11-misc/waybar 
     x11-misc/swaylock 
     sys-apps/btop 
-    www-client/firefox 
-    mail-client/thunderbird 
+    www-client/firefox-bin 
+    mail-client/thunderbird-bin 
     media-video/mpv 
     media-sound/pamixer 
     media-sound/pavucontrol 
@@ -131,18 +131,6 @@ else
     ISNVIDIA=false
 fi
 
-# Disable WiFi powersave prompt
-read -rep $'[\e[1;33mACTION\e[0m] - Would you like to disable WiFi powersave? (y,n) ' WIFI
-if [[ $WIFI == "Y" || $WIFI == "y" ]]; then
-    LOC="/etc/NetworkManager/conf.d/wifi-powersave.conf"
-    echo -e "$CNT - Creating $LOC..."
-    echo -e "[connection]\nwifi.powersave = 2" | sudo tee -a $LOC &>> $INSTLOG
-    echo -en "$CNT - Restarting NetworkManager service..."
-    sleep 2
-    sudo systemctl restart NetworkManager &>> $INSTLOG
-    echo -en "Done!\n"
-    echo -e "$COK - NetworkManager restart completed."
-fi
 
 # Install packages prompt
 read -rep $'[\e[1;33mACTION\e[0m] - Would you like to install the packages? (y,n) ' INST
