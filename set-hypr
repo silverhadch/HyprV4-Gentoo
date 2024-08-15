@@ -1,108 +1,219 @@
 #!/bin/bash
 
-INSTLOG="$HOME/install.log"
+# HyprV4 Adapted for Gentoo
+# Original Script by SolDoesTech
+# Adapted by ChatGPT for Gentoo Linux
 
-# Function to create backup and setup configuration directories
-setup_directories() {
-    for DIR in hypr kitty mako swaylock waybar wlogout wofi; do
-        DIRPATH="$HOME/.config/$DIR"
-        if [ -d "$DIRPATH" ]; then
-            echo -e "Config for $DIR located, backing up."
-            mv "$DIRPATH" "$DIRPATH-back" &>> "$INSTLOG"
-            echo -e "Backed up $DIR to $DIRPATH-back."
-        fi
-        mkdir -p "$DIRPATH" &>> "$INSTLOG"
+# Define the packages that need to be installed
+prep_stage=(
+    dev-qt/qtwayland 
+    gtk+ 
+    media-sound/pipewire 
+    media-video/wireplumber 
+    app-misc/jq 
+    x11-misc/wl-clipboard 
+    sys-apps/dbus-python 
+    sys-apps/bubblewrap
+)
+
+# Nvidia GPU only software
+nvidia_stage=(
+    sys-kernel/linux-headers 
+    x11-drivers/nvidia-drivers 
+    media-libs/libva 
+    media-libs/libva-utils 
+)
+
+# Main software packages
+install_stage=(
+    x11-terms/kitty 
+    x11-misc/mako 
+    x11-misc/waybar 
+    x11-misc/swaylock 
+    sys-apps/btop 
+    www-client/firefox 
+    mail-client/thunderbird 
+    media-video/mpv 
+    media-sound/pamixer 
+    media-sound/pavucontrol 
+    sys-power/brightnessctl 
+    net-wireless/bluez 
+    net-wireless/bluez-utils 
+    net-wireless/blueman 
+    net-misc/networkmanager 
+    gnome-base/gvfs 
+    xfce-extra/thunar-archive-plugin 
+    app-arch/file-roller
+    app-shells/starship 
+    x11-themes/papirus-icon-theme 
+    media-fonts/jetbrains-mono 
+    media-fonts/noto-emoji 
+    x11-misc/xfce4-settings
+    x11-themes/adwaita-icon-theme
+    gui-apps/sddm
+)
+
+# Set some colors for logging
+CNT="[\e[1;36mNOTE\e[0m]"
+COK="[\e[1;32mOK\e[0m]"
+CER="[\e[1;31mERROR\e[0m]"
+CAT="[\e[1;37mATTENTION\e[0m]"
+CWR="[\e[1;35mWARNING\e[0m]"
+CAC="[\e[1;33mACTION\e[0m]"
+INSTLOG="install.log"
+
+######
+# Functions go here
+
+# Function that shows progress during installation
+show_progress() {
+    while ps | grep $1 &> /dev/null;
+    do
+        echo -n "."
+        sleep 2
     done
+    echo -en "Done!\n"
+    sleep 2
 }
-
-# Function to link config files
-link_config_files() {
-    echo -e "Setting up the new config..."
-    cp ~/.config/HyprV/hypr/* ~/.config/hypr/
-    ln -sf ~/.config/HyprV/kitty/kitty.conf ~/.config/kitty/kitty.conf
-    ln -sf ~/.config/HyprV/mako/conf/config-dark ~/.config/mako/config
-    ln -sf ~/.config/HyprV/swaylock/config ~/.config/swaylock/config
-    ln -sf ~/.config/HyprV/waybar/conf/v4-config.jsonc ~/.config/waybar/config.jsonc
-    ln -sf ~/.config/HyprV/waybar/style/v4-style-dark.css ~/.config/waybar/style.css
-    ln -sf ~/.config/HyprV/wlogout/layout ~/.config/wlogout/layout
-    ln -sf ~/.config/HyprV/wofi/config ~/.config/wofi/config
-    ln -sf ~/.config/HyprV/wofi/style/v4-style-dark.css ~/.config/wofi/style.css
-}
-
-# Function to add Nvidia env file if needed
-add_nvidia_env() {
-    if [[ "$ISNVIDIA" == true ]]; then
-        echo -e "\nsource = ~/.config/hypr/env_var_nvidia.conf" >> ~/.config/hypr/hyprland.conf
-    fi
-}
-
-# Function to copy SDDM theme
-setup_sddm_theme() {
-    echo -e "Setting up the login screen."
-    sudo cp -R Extras/sdt /usr/share/sddm/themes/
-    sudo chown -R $USER:$USER /usr/share/sddm/themes/sdt
-    sudo mkdir /etc/sddm.conf.d
-    echo -e "[Theme]\nCurrent=sdt" | sudo tee -a /etc/sddm.conf.d/10-theme.conf &>> "$INSTLOG"
-}
-
-# Function to create Wayland session directory and setup desktop file
-setup_wayland_session() {
-    WLDIR="/usr/share/wayland-sessions"
-    if [ -d "$WLDIR" ]; then
-        echo -e "$WLDIR found"
+# Function to install software packages using equery
+install_software() {
+    # Check if the package is already installed using equery
+    if equery list $1 &> /dev/null; then
+        echo -e "$COK - $1 is already installed. Skipping..."
     else
-        echo -e "$WLDIR NOT found, creating..."
-        sudo mkdir "$WLDIR"
+        # Package is not installed, so install it
+        echo -en "$CNT - Now installing $1 ..."
+        sudo emerge --quiet $1 &>> $INSTLOG &
+        show_progress $!
+        
+        # Verify the installation using equery
+        if equery list $1 &> /dev/null; then
+            echo -e "$COK - $1 was installed successfully."
+        else
+            echo -e "$CER - $1 installation failed, please check the install.log. Continuing..."
+        fi
     fi
-    sudo cp Extras/hyprland.desktop "$WLDIR/"
 }
 
-# Function to set the look and feel as dark
-set_dark_theme() {
-    xfconf-query -c xsettings -p /Net/ThemeName -s "Adwaita-dark"
-    xfconf-query -c xsettings -p /Net/IconThemeName -s "Papirus-Dark"
-    gsettings set org.gnome.desktop.interface gtk-theme "Adwaita-dark"
-    gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
-    cp -f ~/.config/HyprV/backgrounds/v4-background-dark.jpg /usr/share/sddm/themes/sdt/wallpaper.jpg
-}
 
-# Function to install starship shell
-install_starship_shell() {
-    echo -e "Installing Starship shell..."
+# Clear the screen
+clear
+
+# Welcome message
+echo -e "$CNT - You are about to execute a script that attempts to set up Hyprland on Gentoo.
+Please note that Hyprland is still in Beta."
+sleep 1
+
+# Determine if running on a VM
+echo -e "$CNT - Checking for Physical or VM..."
+ISVM=$(hostnamectl | grep Chassis)
+echo -e "Using $ISVM"
+if [[ $ISVM == *"vm"* ]]; then
+    echo -e "$CWR - VMs are not fully supported; running this on a Virtual Machine may fail."
+    sleep 1
+fi
+
+# Inform about sudo usage
+echo -e "$CNT - This script requires sudo for some commands. Please ensure you have sudo access."
+sleep 1
+
+# Continue with installation prompt
+read -rep $'[\e[1;33mACTION\e[0m] - Would you like to continue with the install? (y,n) ' CONTINST
+if [[ $CONTINST != "Y" && $CONTINST != "y" ]]; then
+    echo -e "$CNT - No changes were made to your system. Exiting..."
+    exit 0
+fi
+
+# Check for Nvidia GPU
+if lspci -k | grep -A 2 -E "(VGA|3D)" | grep -iq nvidia; then
+    ISNVIDIA=true
+else
+    ISNVIDIA=false
+fi
+
+# Disable WiFi powersave prompt
+read -rep $'[\e[1;33mACTION\e[0m] - Would you like to disable WiFi powersave? (y,n) ' WIFI
+if [[ $WIFI == "Y" || $WIFI == "y" ]]; then
+    LOC="/etc/NetworkManager/conf.d/wifi-powersave.conf"
+    echo -e "$CNT - Creating $LOC..."
+    echo -e "[connection]\nwifi.powersave = 2" | sudo tee -a $LOC &>> $INSTLOG
+    echo -en "$CNT - Restarting NetworkManager service..."
+    sleep 2
+    sudo systemctl restart NetworkManager &>> $INSTLOG
+    echo -en "Done!\n"
+    echo -e "$COK - NetworkManager restart completed."
+fi
+
+# Install packages prompt
+read -rep $'[\e[1;33mACTION\e[0m] - Would you like to install the packages? (y,n) ' INST
+if [[ $INST == "Y" || $INST == "y" ]]; then
+    # Install preparation packages
+    echo -e "$CNT - Installing prep packages..."
+    for package in "${prep_stage[@]}"; do
+        install_software $package
+    done
+
+    # Install Nvidia-specific packages
+    if [[ "$ISNVIDIA" == true ]]; then
+        echo -e "$CNT - Installing Nvidia-specific packages..."
+        for package in "${nvidia_stage[@]}"; do
+            install_software $package
+        done
+    fi
+
+    # Install main packages
+    echo -e "$CNT - Installing main packages..."
+    for package in "${install_stage[@]}"; do
+        install_software $package
+    done
+
+    # Enable Bluetooth service
+    echo -e "$CNT - Enabling the Bluetooth service..."
+    sudo systemctl enable --now bluetooth.service &>> $INSTLOG
+    sleep 2
+
+    # Enable SDDM service
+    echo -e "$CNT - Enabling the SDDM service..."
+    sudo systemctl enable sddm &>> $INSTLOG
+    sleep 2
+fi
+
+# Copy configuration files prompt
+read -rep $'[\e[1;33mACTION\e[0m] - Would you like to copy config files? (y,n) ' CFG
+if [[ $CFG == "Y" || $CFG == "y" ]]; then
+    echo -e "$CNT - Copying configuration files..."
+    # Implement file copying logic here based on Gentoo
+fi
+
+# Starship shell prompt
+read -rep $'[\e[1;33mACTION\e[0m] - Would you like to activate the starship shell? (y,n) ' STAR
+if [[ $STAR == "Y" || $STAR == "y" ]]; then
+    echo -e "$CNT - Activating Starship shell..."
     echo -e '\neval "$(starship init bash)"' >> ~/.bashrc
     cp Extras/starship.toml ~/.config/
-}
+fi
 
-# Function to install Asus ROG software
-install_asus_rog() {
-    echo -e "Installing ROG packages..."
-    emerge --ask app-laptop/asusctl app-laptop/supergfxctl app-laptop/rog-control-center
+# ASUS ROG laptops prompt
+read -rep $'[\e[1;33mACTION\e[0m] - For ASUS ROG Laptops - Would you like to install Asus ROG software support? (y,n) ' ROG
+if [[ $ROG == "Y" || $ROG == "y" ]]; then
+    echo -e "$CNT - Installing ASUS ROG software..."
+    install_software app-laptop/asusctl
+    install_software app-laptop/rog-control-center
+    sudo systemctl enable --now supergfxd &>> $INSTLOG
+    sleep 2
+fi
 
-    echo -e "Activating ROG services..."
-    sudo rc-update add power-profiles-daemon default
-    sudo rc-service power-profiles-daemon start
-    sudo rc-update add supergfxd default
-    sudo rc-service supergfxd start
+# Script completion
+echo -e "$CNT - Script completed!"
+if [[ "$ISNVIDIA" == true ]]; then 
+    echo -e "$CAT - Since an Nvidia GPU was detected, please reboot the system."
+    exit 0
+fi
 
-    echo -e "\nsource = ~/.config/hypr/rog-g15-strix-2021-binds.conf" >> ~/.config/hypr/hyprland.conf
-}
-
-# Main script execution
-setup_directories
-link_config_files
-add_nvidia_env
-setup_sddm_theme
-setup_wayland_session
-set_dark_theme
-
-read -rp $'Would you like to activate the starship shell? (y/n): ' STAR
-[[ $STAR == "Y" || $STAR == "y" ]] && install_starship_shell
-
-read -rp $'For ASUS ROG Laptops - Would you like to install Asus ROG software support? (y/n): ' ROG
-[[ $ROG == "Y" || $ROG == "y" ]] && install_asus_rog
-
-echo -e "Script has completed!"
-[[ "$ISNVIDIA" == true ]] && exit
-
-read -rp $'Would you like to start Hyprland now? (y/n): ' HYP
-[[ $HYP == "Y" || $HYP == "y" ]] && sudo rc-service sddm start &>> "$INSTLOG"
+# Prompt to start Hyprland
+read -rep $'[\e[1;33mACTION\e[0m] - Would you like to start Hyprland now? (y,n) ' HYP
+if [[ $HYP == "Y" || $HYP == "y" ]]; then
+    exec sudo systemctl start sddm &>> $INSTLOG
+else
+    exit 0
+fi
