@@ -6,5 +6,6 @@ IMPORTANT - This script was meant to run on a clean fresh Arch install on physic
 
 Installing on Gentoo can take time.
 
+Waybar will take a lot lot lot of time, you can check the status in the install.log. (Since large packages are needed as dependencies, welcome to Gentoo my Friend)
 
 Use the attached script "set-hypr" to install everything for you.
