@@ -49,7 +49,7 @@ install_stage=(
     media-fonts/noto-emoji 
     xfce-base/xfce4-settings
     x11-themes/adwaita-icon-theme
-    gui-apps/sddm
+    x11-misc/sddm
 )
 
 # Set some colors for logging
