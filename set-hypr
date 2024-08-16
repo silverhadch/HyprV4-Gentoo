@@ -162,10 +162,22 @@ if [[ $INST == "Y" || $INST == "y" ]]; then
     sudo rc-update add bluetooth default
     sleep 2
 
-    # Enable SDDM service
-    echo -e "$CNT - Enabling the SDDM service..."
-    sudo rc-update add sddm default
+    # Ensure display-manager-init is installed
+    install_software gui-libs/display-manager-init
+
+    # Set SDDM as the display manager in OpenRC
+    echo -e "$CNT - Configuring SDDM as the display manager..."
+    sudo bash -c 'echo -e "CHECKVT=7\nDISPLAYMANAGER=\"sddm\"" > /etc/conf.d/display-manager'
+
+    # Enable elogind and SDDM
+    echo -e "$CNT - Enabling elogind service..."
+    sudo rc-update add elogind boot
+    sudo rc-service elogind start &>> $INSTLOG
     sleep 2
+
+    # Add display-manager to default runlevel but don't start it immediately
+    echo -e "$CNT - Enabling SDDM to start at boot..."
+    sudo rc-update add display-manager default &>> $INSTLOG
 fi
 
 ### Copy Config Files ###
