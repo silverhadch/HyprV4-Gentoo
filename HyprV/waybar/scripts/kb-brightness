@@ -2,47 +2,56 @@
 
 iDIR="$HOME/.config/HyprV/mako/icons"
 
-# Get brightness
+# Get current keyboard backlight brightness percentage
 get_backlight() {
-	LIGHT=$(printf "%.0f\n" $(brightnessctl -d '*::kbd_backlight' i))
-	echo "${LIGHT}%"
+    LIGHT=$(brightnessctl -d '*::kbd_backlight' g)
+    MAX_LIGHT=$(brightnessctl -d '*::kbd_backlight' m)
+    PERCENT=$(printf "%.0f\n" $(echo "($LIGHT/$MAX_LIGHT)*100" | bc -l))
+    echo "${PERCENT}%"
 }
 
-# Get icons
+# Determine the icon based on brightness percentage
 get_icon() {
-	backlight="$(brightnessctl -d '*::kbd_backlight' g)"
-	current="${backlight%%%}"
-	if [[ ("$current" -ge "0") && ("$current" -le "1") ]]; then
-		icon="$iDIR/brightness-20.png"
-	elif [[ ("$current" -ge "1") && ("$current" -le "2") ]]; then
-		icon="$iDIR/brightness-60.png"
-	elif [[ ("$current" -ge "2") && ("$current" -le "3") ]]; then
-		icon="$iDIR/brightness-100.png"
-	fi
+    backlight=$(brightnessctl -d '*::kbd_backlight' g)
+    MAX_LIGHT=$(brightnessctl -d '*::kbd_backlight' m)
+    current=$(printf "%.0f\n" $(echo "($backlight/$MAX_LIGHT)*100" | bc -l))
+
+    if [[ "$current" -le 33 ]]; then
+        icon="$iDIR/brightness-20.png"
+    elif [[ "$current" -le 66 ]]; then
+        icon="$iDIR/brightness-60.png"
+    else
+        icon="$iDIR/brightness-100.png"
+    fi
 }
 
-# Notify
+# Send a notification with the current brightness level
 notify_user() {
-	notify-send -h string:x-canonical-private-synchronous:sys-notify -u low -i "$icon" "Keyboard Brightness : $(brightnessctl -d '*::kbd_backlight' g)"
+    notify-send -h string:x-canonical-private-synchronous:sys-notify -u low -i "$icon" "Keyboard Brightness: $(get_backlight)"
 }
 
-# Increase brightness
+# Increase keyboard backlight brightness
 inc_backlight() {
-	brightnessctl -d *::kbd_backlight set 33%+ && get_icon && notify_user
+    brightnessctl -d '*::kbd_backlight' set 33%+ && get_icon && notify_user
 }
 
-# Decrease brightness
+# Decrease keyboard backlight brightness
 dec_backlight() {
-	brightnessctl -d *::kbd_backlight set 33%- && get_icon && notify_user
+    brightnessctl -d '*::kbd_backlight' set 33%- && get_icon && notify_user
 }
 
-# Execute accordingly
-if [[ "$1" == "--get" ]]; then
-	brightnessctl -d '*::kbd_backlight' g
-elif [[ "$1" == "--inc" ]]; then
-	inc_backlight
-elif [[ "$1" == "--dec" ]]; then
-	dec_backlight
-else
-	get_backlight
-fi
+# Execute commands based on the provided argument
+case "$1" in
+    --get)
+        get_backlight
+        ;;
+    --inc)
+        inc_backlight
+        ;;
+    --dec)
+        dec_backlight
+        ;;
+    *)
+        get_backlight
+        ;;
+esac
