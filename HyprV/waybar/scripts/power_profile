@@ -1,26 +1,40 @@
 #!/bin/bash
 
+# Function to get the current power profile
 get_pwr() {
-    PWR=$(asusctl profile -p | sed s:'Active profile is'::)
+    PWR=$(asusctl profile -p | sed 's:Active profile is ::')
 }
 
+# Initialize the current power profile
 get_pwr
 
-if [ $PWR == Balanced ]; then
-    text="󰾅"
-    tooltip="Balanced"
-elif [ $PWR == Performance ]; then
-    text="󰓅"
-    tooltip="Performance"
-elif [ $PWR == Quiet ]; then
-    text="󰾆"
-    tooltip="Quiet"
-fi
+# Determine the icon and tooltip based on the current power profile
+case "$PWR" in
+    Balanced)
+        text="󰾅"
+        tooltip="Balanced"
+        ;;
+    Performance)
+        text="󰓅"
+        tooltip="Performance"
+        ;;
+    Quiet)
+        text="󰾆"
+        tooltip="Quiet"
+        ;;
+    *)
+        text="󰗯"  # Default icon if profile doesn't match known types
+        tooltip="Unknown"
+        ;;
+esac
 
-echo '{"text": "'$text'", "tooltip": "'$tooltip'"}'
+# Output JSON for Waybar
+echo "{\"text\": \"$text\", \"tooltip\": \"$tooltip\"}"
 
+# Handle the 'next' argument to switch to the next profile
 if [[ "$1" == "next" ]]; then
-    asusctl profile -n; pkill -SIGRTMIN+8 waybar
+    asusctl profile -n
+    pkill -SIGRTMIN+8 waybar  # Refresh Waybar
     get_pwr
     notify-send -h string:x-canonical-private-synchronous:sys-notify -u low "$PWR Power Profile"
 fi
