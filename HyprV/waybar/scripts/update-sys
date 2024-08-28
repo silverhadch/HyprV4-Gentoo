@@ -1,38 +1,42 @@
 #!/usr/bin/env bash
 
-# Original script adapted for Gentoo
-
-# If the operating system is not Gentoo, exit the script successfully
+# Check if the script is running on Gentoo
 if [ ! -d /etc/portage ]; then
     exit 0
 fi
 
-# Calculate updates for each service
-# This assumes you have `eix` installed for quick package database queries.
-AUR=0  # Gentoo doesn't use AUR, so we set it to 0
-OFFICIAL=$(emerge --sync --quiet; eix-update -q; eix -I --only-names --version | wc -l)
+# Calculate updates
+calculate_updates() {
+    # Sync Portage tree and update eix
+    emerge --sync --quiet
+    eix-update -q
+    
+    # Capture the output of 'emerge -uD --pretend @world'
+    local updates
+    updates=$(emerge -uD --pretend @world | grep '^ \[ebuild U\]' | wc -l)
+    
+    echo "$updates"
+}
+
+# Get the number of available updates
+UPDATE_COUNT=$(calculate_updates)
 
 # Case/switch for each service updates
 case $1 in
-    aur) echo "No AUR equivalent in Gentoo";;
-    official) echo " $OFFICIAL";;
+    official) echo " $UPDATE_COUNT";;
 esac
 
 # If the parameter is "update", update all packages
 if [ "$1" = "update" ]; then
-    kitty --title update-sys sh -c 'emerge --sync && emerge -avuDN @world'
+    kitty --title update-sys sh -c 'emerge -uD @world'
 fi
 
 # If there aren't any parameters, return the total number of updates
-if [ "$1" = "" ]; then
-    # Calculate total number of updates
-    COUNT=$((OFFICIAL+AUR))
-
-    if [[ "$COUNT" = "0" ]]; then
+if [ -z "$1" ]; then
+    if [ "$UPDATE_COUNT" -eq 0 ]; then
         echo ""
     else
-        # Display the update symbol and count
-        echo " $COUNT"
+        echo " $UPDATE_COUNT"
     fi
     exit 0
 fi
