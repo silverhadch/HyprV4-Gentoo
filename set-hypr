@@ -193,7 +193,86 @@ fi
 
 # Copy configuration files
 echo -e "$CNT - Copying configuration files..."
-sudo cp -r ~/dotfiles/* ~/.config/ && sudo chown -R $USER:$USER ~/.config
+### Copy Config Files ###
+read -rep $'[\e[1;33mACTION\e[0m] - Would you like to copy config files? (y,n) ' CFG
+if [[ $CFG == "Y" || $CFG == "y" ]]; then
+    # Get the username and home directory of the non-root user
+    TARGET_USER=${SUDO_USER:-$(whoami)}
+    USER_HOME=$(eval echo "~$TARGET_USER")
+
+    echo -e "$CNT - Copying config files..."
+
+    # copy the HyprV directory to the user's config directory
+    cp -R HyprV "$USER_HOME/.config/"
+
+    # Set the measuring unit
+    echo -e "$CNT - Attempting to set measuring unit..."
+    if locale -a | grep -q ^en_US; then
+        echo -e "$COK - Setting measuring system to imperial..."
+        ln -sf "$USER_HOME/.config/HyprV/waybar/conf/mesu-imp.jsonc" "$USER_HOME/.config/HyprV/waybar/conf/mesu.jsonc"
+        sed -i 's/SET_MESU=""/SET_MESU="I"/' "$USER_HOME/.config/HyprV/hyprv.conf"
+    else
+        echo -e "$COK - Setting measuring system to metric..."
+        sed -i 's/SET_MESU=""/SET_MESU="M"/' "$USER_HOME/.config/HyprV/hyprv.conf"
+        ln -sf "$USER_HOME/.config/HyprV/waybar/conf/mesu-met.jsonc" "$USER_HOME/.config/HyprV/waybar/conf/mesu.jsonc"
+    fi
+
+    # Setup each application
+    for DIR in hypr kitty mako swaylock waybar wlogout wofi 
+    do 
+        DIRPATH="$USER_HOME/.config/$DIR"
+        if [ -d "$DIRPATH" ]; then 
+            echo -e "$CAT - Config for $DIR located, backing up."
+            mv "$DIRPATH" "$DIRPATH-back" &>> $INSTLOG
+            echo -e "$COK - Backed up $DIR to $DIRPATH-back."
+        fi
+
+        # Make new empty folders
+        mkdir -p "$DIRPATH" &>> $INSTLOG
+    done
+
+    # Link up the config files
+    echo -e "$CNT - Setting up the new config..." 
+    cp "$USER_HOME/.config/HyprV/hypr/"* "$USER_HOME/.config/hypr/"
+    ln -sf "$USER_HOME/.config/HyprV/kitty/kitty.conf" "$USER_HOME/.config/kitty/kitty.conf"
+    ln -sf "$USER_HOME/.config/HyprV/mako/conf/config-dark" "$USER_HOME/.config/mako/config"
+    ln -sf "$USER_HOME/.config/HyprV/swaylock/config" "$USER_HOME/.config/swaylock/config"
+    ln -sf "$USER_HOME/.config/HyprV/waybar/conf/v4-config.jsonc" "$USER_HOME/.config/waybar/config.jsonc"
+    ln -sf "$USER_HOME/.config/HyprV/waybar/style/v4-style-dark.css" "$USER_HOME/.config/waybar/style.css"
+    ln -sf "$USER_HOME/.config/HyprV/wlogout/layout" "$USER_HOME/.config/wlogout/layout"
+    ln -sf "$USER_HOME/.config/HyprV/wofi/config" "$USER_HOME/.config/wofi/config"
+    ln -sf "$USER_HOME/.config/HyprV/wofi/style/v4-style-dark.css" "$USER_HOME/.config/wofi/style.css"
+
+    # Add the Nvidia env file to the config (if needed)
+    if [[ "$ISNVIDIA" == true ]]; then
+        echo -e "\nsource = $USER_HOME/.config/hypr/env_var_nvidia.conf" >> "$USER_HOME/.config/hypr/hyprland.conf"
+    fi
+
+    # Copy the SDDM theme
+    echo -e "$CNT - Setting up the login screen."
+    sudo cp -R Extras/sdt /usr/share/sddm/themes/
+    sudo chown -R "$TARGET_USER:$TARGET_USER" /usr/share/sddm/themes/sdt
+    sudo mkdir -p /etc/sddm.conf.d
+    echo -e "[Theme]\nCurrent=sdt" | sudo tee -a /etc/sddm.conf.d/10-theme.conf &>> $INSTLOG
+
+    WLDIR=/usr/share/wayland-sessions
+    if [ -d "$WLDIR" ]; then
+        echo -e "$COK - $WLDIR found"
+    else
+        echo -e "$CWR - $WLDIR NOT found, creating..."
+        sudo mkdir $WLDIR
+    fi 
+    
+    # Stage the .desktop file
+    sudo cp Extras/hyprland.desktop /usr/share/wayland-sessions/
+
+    # Setup the first look and feel as dark
+    sudo -u "$TARGET_USER" xfconf-query -c xsettings -p /Net/ThemeName -s "Adwaita-dark"
+    sudo -u "$TARGET_USER" xfconf-query -c xsettings -p /Net/IconThemeName -s "Papirus-Dark"
+    sudo -u "$TARGET_USER" gsettings set org.gnome.desktop.interface gtk-theme "Adwaita-dark"
+    sudo -u "$TARGET_USER" gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
+    sudo -u "$TARGET_USER" cp -f "$USER_HOME/.config/HyprV/backgrounds/v4-background-dark.jpg" /usr/share/sddm/themes/sdt/wallpaper.jpg
+fi
 
 # Finalize
 echo -e "$COK - Setup complete! Please reboot to apply changes."
