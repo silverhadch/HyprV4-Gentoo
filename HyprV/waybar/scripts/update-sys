@@ -1,40 +1,37 @@
 #!/usr/bin/env bash
 
-# Original script by @speltriao on GitHub
-# https://github.com/speltriao/Pacman-Update-for-GNOME-Shell
+# Original script adapted for Gentoo
 
-# If the operating system is not Arch Linux, exit the script successfully
-if [ ! -f /etc/arch-release ]; then
+# If the operating system is not Gentoo, exit the script successfully
+if [ ! -d /etc/portage ]; then
     exit 0
 fi
 
 # Calculate updates for each service
-AUR=$(yay -Qua | wc -l)
-OFFICIAL=$(checkupdates | wc -l)
+# This assumes you have `eix` installed for quick package database queries.
+AUR=0  # Gentoo doesn't use AUR, so we set it to 0
+OFFICIAL=$(emerge --sync --quiet; eix-update -q; eix -I --only-names --version | wc -l)
 
 # Case/switch for each service updates
 case $1 in
-    aur) echo " $AUR";;
+    aur) echo "No AUR equivalent in Gentoo";;
     official) echo " $OFFICIAL";;
 esac
 
-# If the parameter is "update", update all services
+# If the parameter is "update", update all packages
 if [ "$1" = "update" ]; then
-    kitty --title update-sys sh -c 'yay -Syu'
+    kitty --title update-sys sh -c 'emerge --sync && emerge -avuDN @world'
 fi
 
 # If there aren't any parameters, return the total number of updates
 if [ "$1" = "" ]; then
     # Calculate total number of updates
     COUNT=$((OFFICIAL+AUR))
-    # If there are updates, the script will output the following:   Updates
-    # If there are no updates, the script will output nothing.
 
-    if [[ "$COUNT" = "0" ]]
-    then
+    if [[ "$COUNT" = "0" ]]; then
         echo ""
     else
-        # This Update symbol is RTL. So &#x202d; is left-to-right override.
+        # Display the update symbol and count
         echo " $COUNT"
     fi
     exit 0
