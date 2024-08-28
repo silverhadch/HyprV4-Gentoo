@@ -6,7 +6,7 @@
 
 {
     "label" : "hibernate",
-    "action" : "systemctl hibernate",
+    "action" : "hibernate-ram",
     "text" : "Hibernate"
 }
 
@@ -18,18 +18,18 @@
 
 {
     "label" : "shutdown",
-    "action" : "systemctl poweroff",
+    "action" : "halt",
     "text" : "Shutdown"
 }
 
 {
     "label" : "suspend",
-    "action" : "systemctl suspend",
+    "action" : "zzz",
     "text" : "Suspend"
 }
 
 {
     "label" : "reboot",
-    "action" : "systemctl reboot",
+    "action" : "reboot",
     "text" : "Reboot"
 }
