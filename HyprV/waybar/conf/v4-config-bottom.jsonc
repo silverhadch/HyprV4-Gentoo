@@ -22,13 +22,13 @@
 
     "custom/launch_firefox": {
         "format": "",
-        "on-click": "firefox",
+        "on-click": "firefox-bin",
         "tooltip": false
     },
 
     "custom/launch_thunderbird": {
         "format": "󰇰",
-        "on-click": "thunderbird",
+        "on-click": "thunderbird-bin",
         "tooltip": false
     },
 
