@@ -15,6 +15,7 @@ prep_stage=(
     app-misc/jq 
     dev-python/dbus-python 
     sys-apps/bubblewrap
+    app-portage/eix
     gui-wm/hyprland
 )
 
