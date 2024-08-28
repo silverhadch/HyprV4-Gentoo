@@ -2,10 +2,10 @@
 export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
 
-# HyprV4 Adapted for Gentoo
+# Hyprland Setup Script for Gentoo
 # Original Script by SolDoesTech
 
-# Define the packages that need to be installed
+# Define package categories
 prep_stage=(
     dev-qt/qtwayland 
     gtk+
@@ -16,10 +16,10 @@ prep_stage=(
     dev-python/dbus-python 
     sys-apps/bubblewrap
     app-portage/eix
+    media-fonts/symbols-nerd-font
     gui-wm/hyprland
 )
 
-# Nvidia GPU only software
 nvidia_stage=(
     sys-kernel/linux-headers 
     x11-drivers/nvidia-drivers 
@@ -27,7 +27,6 @@ nvidia_stage=(
     media-libs/libva-utils 
 )
 
-# Main software packages
 install_stage=(
     x11-terms/kitty 
     gui-apps/mako 
@@ -56,7 +55,7 @@ install_stage=(
     x11-misc/sddm
 )
 
-# Set some colors for logging
+# Color definitions
 CNT="[\e[1;36mNOTE\e[0m]"
 COK="[\e[1;32mOK\e[0m]"
 CER="[\e[1;31mERROR\e[0m]"
@@ -65,16 +64,14 @@ CWR="[\e[1;35mWARNING\e[0m]"
 CAC="[\e[1;33mACTION\e[0m]"
 INSTLOG="install.log"
 
-######
-# Functions go here
+# Functions
 
-# Clean the install log at the beginning
+# Clean the install log
 > $INSTLOG
 
-# Function that shows progress during installation
+# Show progress of installation
 show_progress() {
-    while ps | grep $1 &> /dev/null;
-    do
+    while ps | grep $1 &> /dev/null; do
         echo -n "."
         sleep 2
     done
@@ -82,67 +79,59 @@ show_progress() {
     sleep 2
 }
 
-# Function to install software packages using equery
+# Install software
 install_software() {
-    # Check if the package is already installed using equery
     if equery list $1 &> /dev/null; then
         echo -e "$COK - $1 is already installed. Skipping..."
     else
-        # Package is not installed, so install it
-        echo -en "$CNT - Now installing $1 ..."
+        echo -en "$CNT - Installing $1 ..."
         sudo emerge --quiet $1 &>> $INSTLOG &
         show_progress $!
-        
-        # Verify the installation using equery
         if equery list $1 &> /dev/null; then
-            echo -e "$COK - $1 was installed successfully."
+            echo -e "$COK - $1 installed successfully."
         else
-            echo -e "$CER - $1 installation failed, please check the install.log. Continuing..."
+            echo -e "$CER - $1 installation failed. Check $INSTLOG."
         fi
     fi
 }
 
-# Clear the screen
+# Clear the screen and show the welcome message
 clear
-
-# Welcome message
-echo -e "$CNT - You are about to execute a script that attempts to set up Hyprland on Gentoo.
-Please note that Hyprland is still in Beta."
+echo -e "$CNT - Setting up Hyprland on Gentoo. Hyprland is currently in Beta."
 sleep 1
 
-# Determine if running on a VM
+# Check if running on a VM
 echo -e "$CNT - Checking for Physical or VM..."
 ISVM=$(hostnamectl | grep Chassis)
 echo -e "Using $ISVM"
 if [[ $ISVM == *"vm"* ]]; then
-    echo -e "$CWR - VMs are not fully supported; running this on a Virtual Machine may fail."
+    echo -e "$CWR - VMs may not be fully supported. Proceed with caution."
     sleep 1
 fi
 
 # Inform about sudo usage
-echo -e "$CNT - This script requires sudo for some commands. Please ensure you have sudo access."
+echo -e "$CNT - This script requires sudo. Ensure you have sudo access."
 sleep 1
 
 # Continue with installation prompt
-read -rep $'[\e[1;33mACTION\e[0m] - Would you like to continue with the install? (y,n) ' CONTINST
+read -rep $'[\e[1;33mACTION\e[0m] - Continue with the install? (y,n) ' CONTINST
 if [[ $CONTINST != "Y" && $CONTINST != "y" ]]; then
-    echo -e "$CNT - No changes were made to your system. Exiting..."
+    echo -e "$CNT - No changes made. Exiting..."
     exit 0
 fi
 
 # Check for Nvidia GPU
+ISNVIDIA=false
 if lspci -k | grep -A 2 -E "(VGA|3D)" | grep -iq nvidia; then
     ISNVIDIA=true
-else
-    ISNVIDIA=false
 fi
 
-# Create and configure package.unmask and package.accept_keywords files
+# Configure Portage settings
 echo -e "$CNT - Configuring package.unmask and package.accept_keywords files..."
+sudo mkdir -p /etc/portage/package.unmask /etc/portage/package.accept_keywords
 
 # Create package.unmask file
 UNMASK_FILE="/etc/portage/package.unmask/custom-unmask"
-sudo mkdir -p /etc/portage/package.unmask
 {
     echo "=net-wireless/bluez-tools-0.2"
     echo "=app-misc/brightnessctl-1.1"
@@ -150,22 +139,19 @@ sudo mkdir -p /etc/portage/package.unmask
 
 # Create package.accept_keywords file
 KEYWORDS_FILE="/etc/portage/package.accept_keywords/custom-keywords"
-sudo mkdir -p /etc/portage/package.accept_keywords
 {
     echo "net-wireless/bluez-tools ~amd64"
     echo "app-misc/brightnessctl ~amd64"
 } | sudo tee $KEYWORDS_FILE
 
 # Install packages prompt
-read -rep $'[\e[1;33mACTION\e[0m] - Would you like to install the packages? (y,n) ' INST
+read -rep $'[\e[1;33mACTION\e[0m] - Install packages? (y,n) ' INST
 if [[ $INST == "Y" || $INST == "y" ]]; then
-    # Install preparation packages
-    echo -e "$CNT - Installing prep packages..."
+    echo -e "$CNT - Installing preparation packages..."
     for package in "${prep_stage[@]}"; do
         install_software $package
     done
 
-    # Install Nvidia-specific packages
     if [[ "$ISNVIDIA" == true ]]; then
         echo -e "$CNT - Installing Nvidia-specific packages..."
         for package in "${nvidia_stage[@]}"; do
@@ -173,129 +159,42 @@ if [[ $INST == "Y" || $INST == "y" ]]; then
         done
     fi
 
-    # Install main packages
     echo -e "$CNT - Installing main packages..."
     for package in "${install_stage[@]}"; do
         install_software $package
     done
 
-    # Enable Bluetooth service
-    echo -e "$CNT - Enabling the Bluetooth service..."
+    echo -e "$CNT - Enabling Bluetooth service..."
     sudo rc-service bluetooth start
     sudo rc-update add bluetooth default
     sleep 2
 
-    # Ensure display-manager-init is installed
     install_software gui-libs/display-manager-init
 
-    # Set SDDM as the display manager in OpenRC
-echo -e "$CNT - Configuring SDDM as the display manager..."
+    echo -e "$CNT - Configuring SDDM as the display manager..."
+    if ! grep -q '^DISPLAYMANAGER="sddm"$' /etc/conf.d/display-manager; then
+        echo -e "$CNT - Configuring SDDM..."
+        sudo cp /etc/conf.d/display-manager /etc/conf.d/display-manager.bak
+        sudo sed -i '/^CHECKVT=/d' /etc/conf.d/display-manager
+        sudo sed -i '/^DISPLAYMANAGER=/d' /etc/conf.d/display-manager
+        echo -e "CHECKVT=7\nDISPLAYMANAGER=\"sddm\"" | sudo tee -a /etc/conf.d/display-manager > /dev/null
+    else
+        echo -e "$CNT - SDDM already configured."
+    fi
 
-# Check if the configuration file already contains SDDM as the display manager
-if ! grep -q '^DISPLAYMANAGER="sddm"$' /etc/conf.d/display-manager; then
-    echo -e "$CNT - SDDM is not configured yet. Configuring it now..."
-    
-    # Back up the current configuration file
-    sudo cp /etc/conf.d/display-manager /etc/conf.d/display-manager.bak
-    
-    # Remove any existing CHECKVT and DISPLAYMANAGER lines, then add new configuration
-    sudo sed -i '/^CHECKVT=/d' /etc/conf.d/display-manager
-    sudo sed -i '/^DISPLAYMANAGER=/d' /etc/conf.d/display-manager
-    
-    # Append the necessary configuration lines
-    echo -e "CHECKVT=7\nDISPLAYMANAGER=\"sddm\"" | sudo tee -a /etc/conf.d/display-manager > /dev/null
-else
-    echo -e "$CNT - SDDM is already configured. Skipping configuration..."
+    echo -e "$CNT - Enabling elogind service..."
+    sudo rc-update add elogind boot
+    sudo rc-service elogind start &>> $INSTLOG
+    sleep 2
+
+    echo -e "$CNT - Enabling SDDM to start at boot..."
+    sudo rc-update add display-manager default &>> $INSTLOG
 fi
 
-# Enable elogind and SDDM
-echo -e "$CNT - Enabling elogind service..."
-sudo rc-update add elogind boot
-sudo rc-service elogind start &>> $INSTLOG
+# Copy configuration files
+echo -e "$CNT - Copying configuration files..."
+sudo cp -r ~/dotfiles/* ~/.config/ && sudo chown -R $USER:$USER ~/.config
+
+# Finalize
+echo -e "$COK - Setup complete! Please reboot to apply changes."
 sleep 2
-
-# Add display-manager to default runlevel but don't start it immediately
-echo -e "$CNT - Enabling SDDM to start at boot..."
-sudo rc-update add display-manager default &>> $INSTLOG
-
-fi
-
-### Copy Config Files ###
-read -rep $'[\e[1;33mACTION\e[0m] - Would you like to copy config files? (y,n) ' CFG
-if [[ $CFG == "Y" || $CFG == "y" ]]; then
-    echo -e "$CNT - Copying config files..."
-
-    # Copy the HyprV directory
-    cp -R HyprV ~/.config/
-
-    # Set the measuring unit
-    echo -e "$CNT - Attempting to set measuring unit..."
-    if locale -a | grep -q ^en_US; then
-        echo -e "$COK - Setting measuring system to imperial..."
-        ln -sf ~/.config/HyprV/waybar/conf/mesu-imp.jsonc ~/.config/HyprV/waybar/conf/mesu.jsonc
-        sed -i 's/SET_MESU=""/SET_MESU="I"/' ~/.config/HyprV/hyprv.conf
-    else
-        echo -e "$COK - Setting measuring system to metric..."
-        sed -i 's/SET_MESU=""/SET_MESU="M"/' ~/.config/HyprV/hyprv.conf
-        ln -sf ~/.config/HyprV/waybar/conf/mesu-met.jsonc ~/.config/HyprV/waybar/conf/mesu.jsonc
-    fi
-
-    # Setup each application
-    # Check for existing config folders and backup 
-    for DIR in hypr kitty mako swaylock waybar wlogout wofi 
-    do 
-        DIRPATH=~/.config/$DIR
-        if [ -d "$DIRPATH" ]; then 
-            echo -e "$CAT - Config for $DIR located, backing up."
-            mv $DIRPATH $DIRPATH-back &>> $INSTLOG
-            echo -e "$COK - Backed up $DIR to $DIRPATH-back."
-        fi
-
-        # Make new empty folders
-        mkdir -p $DIRPATH &>> $INSTLOG
-    done
-
-    # Link up the config files
-    echo -e "$CNT - Setting up the new config..." 
-    cp ~/.config/HyprV/hypr/* ~/.config/hypr/
-    ln -sf ~/.config/HyprV/kitty/kitty.conf ~/.config/kitty/kitty.conf
-    ln -sf ~/.config/HyprV/mako/conf/config-dark ~/.config/mako/config
-    ln -sf ~/.config/HyprV/swaylock/config ~/.config/swaylock/config
-    ln -sf ~/.config/HyprV/waybar/conf/v4-config.jsonc ~/.config/waybar/config.jsonc
-    ln -sf ~/.config/HyprV/waybar/style/v4-style-dark.css ~/.config/waybar/style.css
-    ln -sf ~/.config/HyprV/wlogout/layout ~/.config/wlogout/layout
-    ln -sf ~/.config/HyprV/wofi/config ~/.config/wofi/config
-    ln -sf ~/.config/HyprV/wofi/style/v4-style-dark.css ~/.config/wofi/style.css
-
-    # Add the Nvidia env file to the config (if needed)
-    if [[ "$ISNVIDIA" == true ]]; then
-        echo -e "\nsource = ~/.config/hypr/env_var_nvidia.conf" >> ~/.config/hypr/hyprland.conf
-    fi
-
-    # Copy the SDDM theme
-    echo -e "$CNT - Setting up the login screen."
-    sudo cp -R Extras/sdt /usr/share/sddm/themes/
-    sudo chown -R $USER:$USER /usr/share/sddm/themes/sdt
-    sudo mkdir /etc/sddm.conf.d
-    echo -e "[Theme]\nCurrent=sdt" | sudo tee -a /etc/sddm.conf.d/10-theme.conf &>> $INSTLOG
-    WLDIR=/usr/share/wayland-sessions
-    if [ -d "$WLDIR" ]; then
-        echo -e "$COK - $WLDIR found"
-    else
-        echo -e "$CWR - $WLDIR NOT found, creating..."
-        sudo mkdir $WLDIR
-    fi 
-
-    # Stage the .desktop file
-    sudo cp Extras/hyprland.desktop /usr/share/wayland-sessions/
-
-    # Set the initial theme to dark
-    xfconf-query -c xsettings -p /Net/ThemeName -s "Adwaita-dark"
-    xfconf-query -c xsettings -p /Net/IconThemeName -s "Papirus-Dark"
-    gsettings set org.gnome.desktop.interface gtk-theme "Adwaita-dark"
-    gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
-    cp -f ~/.config/HyprV/backgrounds/v4-background-dark.jpg /usr/share/sddm/themes/sdt/wallpaper.jpg
-fi
-
-# Finish up
-echo -e "$COK - Installation and setup completed. Please reboot to apply all changes."
